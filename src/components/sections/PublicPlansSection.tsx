@@ -247,7 +247,7 @@ const PublicPlansSection = () => {
     const hasSufficientBalance = user && userWalletBalance >= planPrice;
     const isCurrent = isCurrentPlan(plan);
 
-    const MAX_VISIBLE_FEATURES = 8;
+    const MAX_VISIBLE_FEATURES = 5;
     const visibleFeatures = features.slice(0, MAX_VISIBLE_FEATURES);
     const remainingFeatures = Math.max(0, features.length - MAX_VISIBLE_FEATURES);
 
