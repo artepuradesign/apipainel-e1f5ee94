@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import { useModuleRecords } from '@/hooks/useModuleRecords';
 import { usePixPaymentFlow } from '@/hooks/usePixPaymentFlow';
 import { useUserDataApi } from '@/hooks/useUserDataApi';
 import PixQRCodeModal from '@/components/payment/PixQRCodeModal';
+import FloatingPendingPix from '@/components/payment/FloatingPendingPix';
+import QRCode from 'react-qr-code';
 import { API_BASE_URL } from '@/config/apiConfig';
 
 interface PanelsGridProps {
@@ -44,10 +46,13 @@ const PanelsGrid: React.FC<PanelsGridProps> = ({ activePanels }) => {
   const isMobile = useIsMobile();
   const { hasRecordsInModule } = useModuleRecords();
   const { userData } = useUserDataApi();
-  const { loading: pixLoading, pixResponse, checkingPayment, createPixPayment, checkPaymentStatus, generateNewPayment } = usePixPaymentFlow();
+  const { loading: pixLoading, pixResponse, checkingPayment, createPixPayment, checkPaymentStatus, generateNewPayment, cancelPayment } = usePixPaymentFlow();
   
   const [showPixModal, setShowPixModal] = useState(false);
   const [pixModuleAmount, setPixModuleAmount] = useState(0);
+  const [purchasingModule, setPurchasingModule] = useState<{ title: string; route: string } | null>(null);
+  const [showFloatingPix, setShowFloatingPix] = useState(false);
+  const [notificationToastId, setNotificationToastId] = useState<string | number | null>(null);
   
   // Obter plano atual (subscription > planInfo > fallback em localStorage)
   // Importante: parênteses para evitar precedência incorreta entre `||` e ternário.
@@ -137,20 +142,81 @@ const PanelsGrid: React.FC<PanelsGridProps> = ({ activePanels }) => {
   };
 
   // Handler para compra direta via PIX no overlay do módulo
-  const handleDirectPurchase = async (e: React.MouseEvent, amount: number) => {
+  const handleDirectPurchase = async (e: React.MouseEvent, amount: number, module: any) => {
     e.stopPropagation();
     const remaining = Math.max(amount - totalAvailableBalance, 0.01);
     setPixModuleAmount(remaining);
     
+    const moduleRoute = getModulePageRoute(module);
+    setPurchasingModule({ title: module.title, route: moduleRoute });
+    
     const pixData = await createPixPayment(remaining, userData);
     if (pixData) {
       setShowPixModal(true);
+      setShowFloatingPix(false);
+      
+      // Criar notificação toast com QR code embutido
+      const tId = toast.info(
+        <div className="flex items-center gap-3">
+          {pixData.qr_code && (
+            <div className="flex-shrink-0 bg-white p-2 rounded border-2 border-green-500">
+              <QRCode value={pixData.qr_code} size={70} />
+            </div>
+          )}
+          <div className="space-y-2">
+            <div>
+              <p className="font-semibold text-sm">PIX para {module.title}</p>
+              <p className="text-xs text-muted-foreground">Não feche sem pagar!</p>
+            </div>
+            <button
+              onClick={() => {
+                toast.dismiss(tId);
+                handleCancelPurchase();
+              }}
+              className="text-xs px-2 py-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>,
+        {
+          duration: Infinity,
+          action: {
+            label: 'Ver QR Code',
+            onClick: () => setShowPixModal(true)
+          },
+        }
+      );
+      setNotificationToastId(tId);
     }
   };
 
-  // Auto-check payment status while PIX modal is open
+  // Handler para cancelar compra
+  const handleCancelPurchase = () => {
+    if (pixResponse?.payment_id) {
+      cancelPayment(pixResponse.payment_id);
+    }
+    setShowPixModal(false);
+    setShowFloatingPix(false);
+    setPurchasingModule(null);
+    if (notificationToastId) {
+      toast.dismiss(notificationToastId);
+      setNotificationToastId(null);
+    }
+    toast.info('Ordem de compra cancelada');
+  };
+
+  // Handler para fechar modal (mantém floating)
+  const handleClosePixModal = () => {
+    setShowPixModal(false);
+    if (pixResponse && pixResponse.status !== 'approved') {
+      setShowFloatingPix(true);
+    }
+  };
+
+  // Auto-check payment status while PIX modal is open OR floating widget is visible
   useEffect(() => {
-    if (!showPixModal || !pixResponse?.payment_id) return;
+    if ((!showPixModal && !showFloatingPix) || !pixResponse?.payment_id) return;
     let cancelled = false;
 
     const checkLive = async () => {
@@ -162,9 +228,19 @@ const PanelsGrid: React.FC<PanelsGridProps> = ({ activePanels }) => {
         const data = await res.json();
         const newStatus = data?.data?.status;
         if (newStatus === 'approved' && !cancelled) {
-          toast.success('🎉 Pagamento Aprovado! Saldo creditado.');
+          toast.success('🎉 Pagamento Aprovado! Redirecionando...');
           setShowPixModal(false);
-          setTimeout(() => window.location.href = '/dashboard', 1500);
+          setShowFloatingPix(false);
+          if (notificationToastId) {
+            toast.dismiss(notificationToastId);
+            setNotificationToastId(null);
+          }
+          // Redirecionar para a página do módulo que estava sendo comprado
+          const targetRoute = purchasingModule?.route || '/dashboard';
+          setPurchasingModule(null);
+          setTimeout(() => {
+            window.location.href = targetRoute;
+          }, 1500);
         }
       } catch (error) {
         console.error('Erro ao checar status (live):', error);
@@ -174,7 +250,7 @@ const PanelsGrid: React.FC<PanelsGridProps> = ({ activePanels }) => {
     const interval = setInterval(checkLive, 3000);
     checkLive();
     return () => { cancelled = true; clearInterval(interval); };
-  }, [showPixModal, pixResponse?.payment_id]);
+  }, [showPixModal, showFloatingPix, pixResponse?.payment_id]);
 
   const handlePixPaymentConfirm = async () => {
     if (!pixResponse?.payment_id) return;
@@ -183,7 +259,16 @@ const PanelsGrid: React.FC<PanelsGridProps> = ({ activePanels }) => {
     if (status === 'approved') {
       toast.success('🎉 Pagamento aprovado!', { id: 'checking-pix' });
       setShowPixModal(false);
-      setTimeout(() => window.location.href = '/dashboard', 1500);
+      setShowFloatingPix(false);
+      if (notificationToastId) {
+        toast.dismiss(notificationToastId);
+        setNotificationToastId(null);
+      }
+      const targetRoute = purchasingModule?.route || '/dashboard';
+      setPurchasingModule(null);
+      setTimeout(() => {
+        window.location.href = targetRoute;
+      }, 1500);
     } else {
       toast.info('⏳ Ainda processando, aguarde...', { id: 'checking-pix' });
     }
@@ -337,7 +422,7 @@ const PanelsGrid: React.FC<PanelsGridProps> = ({ activePanels }) => {
                             <Button
                               size="sm"
                               className="bg-green-500 hover:bg-green-600 text-white text-xs font-semibold w-full"
-                              onClick={(e) => handleDirectPurchase(e, finalDiscountedPrice)}
+                              onClick={(e) => handleDirectPurchase(e, finalDiscountedPrice, module)}
                               disabled={pixLoading}
                             >
                               <ShoppingCart className="h-3.5 w-3.5 mr-1" />
@@ -379,12 +464,25 @@ const PanelsGrid: React.FC<PanelsGridProps> = ({ activePanels }) => {
     {/* Modal PIX para compra direta */}
     <PixQRCodeModal
       isOpen={showPixModal}
-      onClose={() => setShowPixModal(false)}
+      onClose={handleClosePixModal}
       amount={pixModuleAmount}
       onPaymentConfirm={handlePixPaymentConfirm}
       isProcessing={checkingPayment}
       pixData={pixResponse}
       onGenerateNew={() => generateNewPayment(pixModuleAmount, userData)}
+    />
+
+    {/* Widget flutuante de PIX pendente */}
+    <FloatingPendingPix
+      isVisible={showFloatingPix && !showPixModal}
+      pixData={pixResponse}
+      amount={pixModuleAmount}
+      moduleName={purchasingModule?.title}
+      onOpenModal={() => {
+        setShowPixModal(true);
+        setShowFloatingPix(false);
+      }}
+      onCancel={handleCancelPurchase}
     />
   </>
   );
