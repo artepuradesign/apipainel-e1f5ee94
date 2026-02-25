@@ -247,122 +247,149 @@ const PublicPlansSection = () => {
     const hasSufficientBalance = user && userWalletBalance >= planPrice;
     const isCurrent = isCurrentPlan(plan);
 
-    // Exibir um número fixo de módulos para manter altura padrão dos cards
     const MAX_VISIBLE_FEATURES = 8;
     const visibleFeatures = features.slice(0, MAX_VISIBLE_FEATURES);
     const remainingFeatures = Math.max(0, features.length - MAX_VISIBLE_FEATURES);
 
     return (
-      <div className="w-full max-w-[240px] mx-auto">
-        <Card
-          className={`relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border border-white/20 dark:border-gray-700/30 shadow-md hover:shadow-lg transition-all duration-300 group ${
-            isCurrent ? 'ring-2 ring-primary shadow-lg' : ''
-          } ${
-            plan.is_popular ? 'ring-1 ring-purple-400/40 dark:ring-purple-500/40' : ''
-          }`}
+      <div className="w-full max-w-[260px] mx-auto">
+        <motion.div
+          whileHover={{ y: -6, scale: 1.03 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="h-full"
         >
-          <CardContent className="p-4 flex flex-col">
-            {/* Badge plano atual */}
-            {isCurrent && (
-              <div className="absolute top-2 left-2 z-10">
-                <Badge className="text-[10px] px-2 py-0.5">PLANO ATUAL</Badge>
-              </div>
-            )}
+          <div
+            className={`relative rounded-2xl overflow-hidden h-full flex flex-col transition-all duration-500 ${
+              isCurrent 
+                ? 'ring-2 ring-primary shadow-2xl shadow-primary/20' 
+                : plan.is_popular 
+                  ? 'shadow-xl shadow-purple-500/15 dark:shadow-purple-500/25' 
+                  : 'shadow-lg hover:shadow-xl'
+            }`}
+            style={{
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(249,250,251,0.9) 100%)',
+            }}
+          >
+            {/* Borda gradiente superior */}
+            <div className="h-1 w-full bg-gradient-to-r from-purple-500 via-violet-500 to-indigo-500" />
 
-            {/* Badge popular */}
-            {plan.is_popular && (
-              <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                <span className="px-2 py-0.5 bg-purple-500 text-white text-xs font-medium rounded-full">
-                  {plan.badge || 'Popular'}
-                </span>
-              </div>
-            )}
+            {/* Glass overlay para dark mode */}
+            <div className="absolute inset-0 dark:bg-gray-900/90 dark:backdrop-blur-xl pointer-events-none" />
 
-            {/* Header compacto */}
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate mb-1">
+            {/* Decoração de fundo */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-indigo-500/10 to-transparent rounded-tr-full pointer-events-none" />
+
+            <div className="relative z-10 p-5 flex flex-col h-full">
+              {/* Badge plano atual */}
+              {isCurrent && (
+                <div className="absolute top-3 left-3 z-10">
+                  <Badge className="text-[10px] px-2 py-0.5 bg-primary text-primary-foreground font-semibold shadow-sm">
+                    ✦ PLANO ATUAL
+                  </Badge>
+                </div>
+              )}
+
+              {/* Badge popular */}
+              {plan.is_popular && (
+                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 z-20">
+                  <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-violet-600 text-white text-[10px] font-bold rounded-b-lg shadow-lg shadow-purple-500/30 tracking-wider uppercase">
+                    {plan.badge || '★ Popular'}
+                  </span>
+                </div>
+              )}
+
+              {/* Header */}
+              <div className={`${plan.is_popular ? 'mt-4' : 'mt-1'} mb-4`}>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1 tracking-tight">
                   {plan.name}
                 </h3>
-                <span className="inline-flex items-center px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 text-xs rounded">
-                  {plan.duration_days} dias
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                  {plan.description}
+                </p>
+              </div>
+
+              {/* Preço */}
+              <div className="flex items-end gap-2 mb-1">
+                <span className="text-2xl font-extrabold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                  {plan.priceFormatted || formatCurrency(plan.price)}
                 </span>
               </div>
-              <div className="text-right shrink-0">
-                <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                  {plan.priceFormatted || formatCurrency(plan.price)}
-                </div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="inline-flex items-center px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-medium rounded-full border border-purple-200/50 dark:border-purple-700/30">
+                  {plan.duration_days} dias
+                </span>
                 {plan.discount_percentage > 0 && (
-                  <span className="text-xs text-green-600 font-medium">
-                    -{plan.discount_percentage}%
+                  <span className="inline-flex items-center px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-full border border-emerald-200/50 dark:border-emerald-700/30">
+                    -{plan.discount_percentage}% OFF
                   </span>
                 )}
               </div>
-            </div>
 
-            {/* Descrição curta */}
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
-              {plan.description}
-            </p>
+              {/* Separador */}
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 dark:via-gray-700 to-transparent mb-4" />
 
-            {/* Features compactas */}
-            <div className="space-y-1.5 mb-4">
-              {visibleFeatures.map((feature: string, index: number) => (
-                <div key={index} className="flex items-start gap-1.5 text-xs text-gray-600 dark:text-gray-300">
-                  <Check className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
-                  <span className="leading-snug">{feature}</span>
-                </div>
-              ))}
-              {remainingFeatures > 0 && (
-                <div className="text-xs text-gray-400 dark:text-gray-500">
-                  +{remainingFeatures} mais
-                </div>
-              )}
-            </div>
-
-            {/* Botões */}
-            <div className="space-y-1.5">
-              <Button
-                size="sm"
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs h-8"
-                onClick={() => handlePlanSelection(plan)}
-              >
-                Adquirir
-              </Button>
-
-              {user && hasSufficientBalance && (
-                <Button
-                  size="sm"
-                  className="w-full bg-green-600 hover:bg-green-700 text-white text-xs h-8"
-                  onClick={() => handleUpgradePlan(plan)}
-                >
-                  <CreditCard className="h-3 w-3 mr-1" />
-                  Upgrade
-                </Button>
-              )}
-            </div>
-
-            {user && !hasSufficientBalance && (
-              <div className="mt-2 text-center">
-                <p className="text-xs text-red-500 mb-1">
-                  +R$ {(planPrice - userWalletBalance).toFixed(2)} para Upgrade
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-green-600 hover:text-green-700 h-6 px-2"
-                  onClick={() =>
-                    navigate(
-                      `/dashboard/adicionar-saldo?valor=${(planPrice - userWalletBalance).toFixed(2)}`
-                    )
-                  }
-                >
-                  Adicionar Saldo
-                </Button>
+              {/* Features */}
+              <div className="space-y-2 mb-5 flex-grow">
+                {visibleFeatures.map((feature: string, index: number) => (
+                  <div key={index} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300">
+                    <div className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                      <Check className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <span className="leading-relaxed">{feature}</span>
+                  </div>
+                ))}
+                {remainingFeatures > 0 && (
+                  <div className="text-[11px] text-purple-500 dark:text-purple-400 font-medium pl-6">
+                    +{remainingFeatures} recursos adicionais
+                  </div>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+
+              {/* Botões */}
+              <div className="space-y-2 mt-auto">
+                <Button
+                  size="sm"
+                  className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white text-xs h-9 rounded-xl font-semibold shadow-md shadow-purple-500/20 hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300"
+                  onClick={() => handlePlanSelection(plan)}
+                >
+                  Adquirir Plano
+                </Button>
+
+                {user && hasSufficientBalance && (
+                  <Button
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white text-xs h-9 rounded-xl font-semibold shadow-md shadow-emerald-500/20 transition-all duration-300"
+                    onClick={() => handleUpgradePlan(plan)}
+                  >
+                    <CreditCard className="h-3 w-3 mr-1.5" />
+                    Upgrade com Saldo
+                  </Button>
+                )}
+              </div>
+
+              {user && !hasSufficientBalance && (
+                <div className="mt-3 text-center p-2 rounded-xl bg-red-50/80 dark:bg-red-900/20 border border-red-200/50 dark:border-red-800/30">
+                  <p className="text-[10px] text-red-500 dark:text-red-400 mb-1 font-medium">
+                    Faltam R$ {(planPrice - userWalletBalance).toFixed(2)} para Upgrade
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[10px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 h-5 px-2 font-semibold"
+                    onClick={() =>
+                      navigate(
+                        `/dashboard/adicionar-saldo?valor=${(planPrice - userWalletBalance).toFixed(2)}`
+                      )
+                    }
+                  >
+                    + Adicionar Saldo
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
       </div>
     );
   };
